@@ -16,6 +16,8 @@ class UnifiedSFTDataset(Dataset):
         self.system = template.system
 
         self.max_seq_length = max_seq_length
+        if not file.endswith('.jsonl'):
+            raise ValueError('UnifiedSFTDataset only support jsonl file')
         logger.info('Loading data: {}'.format(file))
         with open(file, 'r', encoding='utf8') as f:
             data_list = f.readlines()
@@ -289,3 +291,18 @@ class UnifiedDPODataset(Dataset):
     # 为了适配DPOTrainer的接口
     def map(self, func, **kwargs):
         return self
+
+
+if __name__ == '__main__':
+    from component.template import template_dict
+    from transformers import AutoTokenizer
+    tokenizer = AutoTokenizer.from_pretrained('./meta-llama/Meta-Llama-3-8B')
+    template=template_dict['llama3']
+    train_dataset = UnifiedSFTDataset("data/dummy_data.jsonl", tokenizer, 4096, template)
+
+    # print batch data with data loader
+    from torch.utils.data import DataLoader
+    train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True)
+    for batch in train_loader:
+        print(batch)
+        break
