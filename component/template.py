@@ -39,6 +39,26 @@ register_template(
 )
 
 register_template(
+    template_name='llama3',
+    system_format='<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{content}<|eot_id|>',
+    user_format='<|start_header_id|>user<|end_header_id|>\n\n{content}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n',
+    assistant_format='{content}<|eot_id|>',
+    system=None,
+    stop_word='<|eot_id|>'
+)
+
+register_template(
+    template_name='yi',
+    system_format='<|im_start|>system\n{content}<|im_end|>\n',
+    user_format='<|im_start|>user\n{content}<|im_end|>\n<|im_start|>assistant\n',
+    assistant_format='{content}<|im_end|>\n',
+    system=None,
+    stop_word='<|im_end|>'
+)
+
+# -------------------------------------------------------- #
+
+register_template(
     template_name='internlm',
     system_format="<|System|>:{content}\n",
     user_format='<|User|>:{content}\n<|Bot|>:',
@@ -211,15 +231,6 @@ register_template(
         "explain why instead of answering something not correct. "
         "If you don't know the answer to a question, please don't share false information.",
     stop_word='</s>'
-)
-
-register_template(
-    template_name='llama3',
-    system_format='<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{content}<|eot_id|>',
-    user_format='<|start_header_id|>user<|end_header_id|>\n\n{content}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n',
-    assistant_format='{content}<|eot_id|>',
-    system=None,
-    stop_word='<|eot_id|>'
 )
 
 register_template(

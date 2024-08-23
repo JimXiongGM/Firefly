@@ -1,7 +1,7 @@
 import json
 from loguru import logger
 from torch.utils.data import Dataset
-
+from typing import List, Dict
 
 class UnifiedSFTDataset(Dataset):
     """
@@ -72,85 +72,6 @@ class UnifiedSFTDataset(Dataset):
         return inputs
 
 
-class ChatGLM2SFTDataset(UnifiedSFTDataset):
-
-    def __getitem__(self, index):
-        # 每条数据格式为: [gMASK]sop [Round 1]\n\n问：{input1}\n\n答：{target1}</s>[Round 2]\n\n问：{input2}\n\n答：{target2}</s>...
-        data = self.data_list[index]
-        data = json.loads(data)
-
-        input_ids = self.tokenizer.get_prefix_tokens()
-        target_mask = [0] * len(input_ids)
-
-        conversations = data['conversation']
-        # 拼接多轮对话
-        for i, conv in enumerate(conversations):
-            human = conv['human'].strip()
-            assistant = conv['assistant'].strip()
-
-            human = self.user_format.format(content=human, idx=i + 1)
-            assistant = self.assistant_format.format(content=assistant)
-
-            input_tokens = self.tokenizer.encode(human, add_special_tokens=False)
-            output_tokens = self.tokenizer.encode(assistant, add_special_tokens=False) + [self.tokenizer.eos_token_id]
-
-            input_ids += input_tokens + output_tokens
-            target_mask += [0] * len(input_tokens) + [1] * len(output_tokens)
-
-        assert len(input_ids) == len(target_mask)
-        # 对长度进行截断
-        input_ids = input_ids[:self.max_seq_length]
-        target_mask = target_mask[:self.max_seq_length]
-        attention_mask = [1] * len(input_ids)
-        assert len(input_ids) == len(target_mask) == len(attention_mask)
-        inputs = {
-            'input_ids': input_ids,
-            'attention_mask': attention_mask,
-            'target_mask': target_mask
-        }
-        return inputs
-
-
-class ChatGLM3SFTDataset(UnifiedSFTDataset):
-
-    def __getitem__(self, index):
-        # [gMASK]sop <|system|>xxx<|user|>xxx<|assistant|>xxx<eos>
-        data = self.data_list[index]
-        data = json.loads(data)
-        system = data['system'].strip() if 'system' in data.keys() else self.system
-        input_ids = self.tokenizer.get_prefix_tokens() + \
-                    [self.tokenizer.get_command(f"<|system|>")] + \
-                    self.tokenizer.encode(system, add_special_tokens=False)
-        target_mask = [0] * len(input_ids)
-
-        conversations = data['conversation']
-        # 拼接多轮对话
-        for i, conv in enumerate(conversations):
-            human = conv['human'].strip()
-            assistant = conv['assistant'].strip()
-
-            input_tokens = [self.tokenizer.get_command(f"<|user|>")] + \
-                           self.tokenizer.encode(human, add_special_tokens=False) + \
-                           [self.tokenizer.get_command(f"<|assistant|>")]
-            output_tokens = self.tokenizer.encode(assistant, add_special_tokens=False) + [self.tokenizer.eos_token_id]
-
-            input_ids += input_tokens + output_tokens
-            target_mask += [0] * len(input_tokens) + [1] * len(output_tokens)
-
-        assert len(input_ids) == len(target_mask)
-        # 对长度进行截断
-        input_ids = input_ids[:self.max_seq_length]
-        target_mask = target_mask[:self.max_seq_length]
-        attention_mask = [1] * len(input_ids)
-        assert len(input_ids) == len(target_mask) == len(attention_mask)
-        inputs = {
-            'input_ids': input_ids,
-            'attention_mask': attention_mask,
-            'target_mask': target_mask
-        }
-        return inputs
-
-
 class UnifiedDPODataset(Dataset):
     """
     统一的DPO数据集
@@ -175,17 +96,13 @@ class UnifiedDPODataset(Dataset):
     def __len__(self):
         return len(self.data_list)
 
-    def build_prompt_input_ids(self, system, history):
+    def build_prompt_input_ids(self, system, history: List[Dict]):
         """
         chatglm2: [gMASK]sop [Round 1]\n\n问：{input1}\n\n答：{target1}</s>[Round 2]\n\n问：{input2}\n\n答：{target2}</s>...
         chatglm3: [gMASK]sop <|system|>xxx<|user|>xxx<|assistant|>xxx<eos>
         others: {system_format}{user_format}{assistant_format}{user_format}{assistant_format}...
         """
-        # chatglm模型具有特殊的起始token
-        if self.template_name in ['chatglm2', 'chatglm3']:
-            prompt_input_ids = self.tokenizer.get_prefix_tokens()
-        else:
-            prompt_input_ids = []
+        prompt_input_ids = []
 
         # collect system information
         if self.system_format is not None:
@@ -205,22 +122,11 @@ class UnifiedDPODataset(Dataset):
 
             assert role != 'system', 'there should not be more than one system information'
             if role == 'user':
-                if self.template_name == 'chatglm2':
-                    human = self.user_format.format(content=content, idx=i//2 + 1)
-                    input_ids = self.tokenizer.encode(human, add_special_tokens=False)
-                elif self.template_name == 'chatglm3':
-                    input_ids = [self.tokenizer.get_command(f"<|user|>")] + \
-                                self.tokenizer.encode(content, add_special_tokens=False) + \
-                                [self.tokenizer.get_command(f"<|assistant|>")]
-                else:
-                    human = self.user_format.format(content=content, stop_token=self.tokenizer.eos_token)
-                    input_ids = self.tokenizer.encode(human, add_special_tokens=False)
+                human = self.user_format.format(content=content, stop_token=self.tokenizer.eos_token)
+                input_ids = self.tokenizer.encode(human, add_special_tokens=False)
             elif role == 'assistant':
-                if self.template_name in ['chatglm2', 'chatglm3']:
-                    input_ids = self.tokenizer.encode(content, add_special_tokens=False) + [self.tokenizer.eos_token_id]
-                else:
-                    assistant = self.assistant_format.format(content=content, stop_token=self.tokenizer.eos_token)
-                    input_ids = self.tokenizer.encode(assistant, add_special_tokens=False)
+                assistant = self.assistant_format.format(content=content, stop_token=self.tokenizer.eos_token)
+                input_ids = self.tokenizer.encode(assistant, add_special_tokens=False)
             else:
                 raise Exception('role error')
             prompt_input_ids += input_ids
@@ -230,9 +136,12 @@ class UnifiedDPODataset(Dataset):
     def __getitem__(self, index):
         data = self.data_list[index]
         data = json.loads(data)
-        chosen = data['chosen']
+        chosen = data['chosen'] # dict{"role": "assistant|user", "content": "xxx"}
         rejected = data['rejected']
         assert len(chosen) == len(rejected)
+
+        # 冗余？？？
+        assert chosen[0]["content"] == rejected[0]["content"]
 
         # 判断第0个是否为system
         if chosen[0]['role'] == 'system':
@@ -248,15 +157,11 @@ class UnifiedDPODataset(Dataset):
         prompt_input_ids = self.build_prompt_input_ids(system, history)
 
         # build response
-        if self.template_name in ['chatglm2', 'chatglm3']:
-            chosen_input_ids = self.tokenizer.encode(chosen['content'], add_special_tokens=False) + [self.tokenizer.eos_token_id]
-            rejected_input_ids = self.tokenizer.encode(rejected['content'], add_special_tokens=False) + [self.tokenizer.eos_token_id]
-        else:
-            chosen = self.assistant_format.format(content=chosen['content'], stop_token=self.tokenizer.eos_token)
-            rejected = self.assistant_format.format(content=rejected['content'], stop_token=self.tokenizer.eos_token)
+        chosen = self.assistant_format.format(content=chosen['content'], stop_token=self.tokenizer.eos_token)
+        rejected = self.assistant_format.format(content=rejected['content'], stop_token=self.tokenizer.eos_token)
 
-            chosen_input_ids = self.tokenizer.encode(chosen, add_special_tokens=False)
-            rejected_input_ids = self.tokenizer.encode(rejected, add_special_tokens=False)
+        chosen_input_ids = self.tokenizer.encode(chosen, add_special_tokens=False)
+        rejected_input_ids = self.tokenizer.encode(rejected, add_special_tokens=False)
 
         # truncate by max_seq_length
         longer_response_length = max(len(chosen_input_ids), len(rejected_input_ids))
@@ -294,15 +199,16 @@ class UnifiedDPODataset(Dataset):
 
 
 if __name__ == '__main__':
+    # python component/dataset.py
     from component.template import template_dict
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained('./meta-llama/Meta-Llama-3-8B')
-    template=template_dict['llama3']
-    train_dataset = UnifiedSFTDataset("data/dummy_data.jsonl", tokenizer, 4096, template)
+    tokenizer = AutoTokenizer.from_pretrained('./meta-llama/Meta-Llama-3.1-8B-Instruct')
+    train_dataset = UnifiedDPODataset("data/dummy_dpo.jsonl", tokenizer, 4096, 512, template_dict['llama3'])
+    # train_dataset = UnifiedSFTDataset("data/dummy_data.jsonl", tokenizer, 4096, template_dict['llama3'])
 
     # print batch data with data loader
     from torch.utils.data import DataLoader
-    train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=False)
     for batch in train_loader:
         print(batch)
         break

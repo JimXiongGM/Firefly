@@ -10,8 +10,8 @@ from component.argument import CustomizedArguments
 from component.template import template_dict
 from component.dataset import (
     UnifiedSFTDataset,
-    ChatGLM2SFTDataset,
-    ChatGLM3SFTDataset,
+    # ChatGLM2SFTDataset,
+    # ChatGLM3SFTDataset,
     UnifiedDPODataset
 )
 from transformers import (
@@ -61,7 +61,7 @@ def setup_everything():
     # 设置随机种子
     set_seed(training_args.seed)
 
-    # check some setting
+    # check some setting ?? 直接在args里面设置不就好了吗
     assert args.task_type in ['pretrain', 'sft', 'dpo'], "task_type should be in ['pretrain', 'sft', 'dpo']"
     assert args.train_mode in ['full', 'lora', 'qlora'], "task_type should be in ['full', 'lora', 'qlora']"
     assert sum([training_args.fp16, training_args.bf16]) == 1, "only one of fp16 and bf16 can be True"
@@ -241,7 +241,7 @@ def load_model(args, training_args):
     model_kwargs = dict(
         trust_remote_code=True,
         # attn_implementation=attn_implementation,
-        torch_dtype=torch_dtype,
+        # torch_dtype=torch_dtype,
         use_cache=False if training_args.gradient_checkpointing else True,
         device_map=get_kbit_device_map() if quantization_config is not None else None,
         quantization_config=quantization_config,
@@ -335,6 +335,11 @@ def init_components(args, training_args):
     training_args.ddp_find_unused_parameters = False
     logger.info('Initializing components...')
 
+    # from trl import SFTConfig
+    # training_args = SFTConfig(**training_args.to_dict())
+    # print(training_args)
+    # exit()
+
     # 加载tokenizer
     tokenizer = load_tokenizer(args)
     # 加载model
@@ -359,6 +364,8 @@ def init_components(args, training_args):
 
     # dpo
     if args.task_type == 'dpo':
+        from trl import DPOConfig
+        training_args = DPOConfig(**training_args.to_dict())
         trainer = DPOTrainer(
             model,
             ref_model,
