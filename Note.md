@@ -14,6 +14,6 @@ torchrun --nproc_per_node={num_gpus} train.py --train_args_file train_args/sft/q
 DPO
 
 ```bash
-deepspeed train_my.py --train_args_file train_args/dpo/full/qwen1.5-7b-dpo-full.json
-
+deepspeed train_my.py --train_args_file train_args/dpo/full/llama3.1-8B-dpo-full.json
+deepspeed --include localhost:3,5 train.py --train_args_file train_args/dpo/full/llama3.1-8B-dpo-full.json
 ```
