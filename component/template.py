@@ -48,6 +48,15 @@ register_template(
 )
 
 register_template(
+    template_name='gemma',
+    system_format='<bos>',
+    user_format='<start_of_turn>user\n{content}<end_of_turn>\n<start_of_turn>model\n',
+    assistant_format='{content}<eos>\n',
+    system='',
+    stop_word='<eos>'
+)
+
+register_template(
     template_name='yi',
     system_format='<|im_start|>system\n{content}<|im_end|>\n',
     user_format='<|im_start|>user\n{content}<|im_end|>\n<|im_start|>assistant\n',

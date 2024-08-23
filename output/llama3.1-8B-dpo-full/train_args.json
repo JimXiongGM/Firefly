@@ -24,7 +24,7 @@
     "disable_tqdm": false,
     "optim": "paged_adamw_32bit",
     "seed": 42,
-    "fp16": true,
+    "bf16": true,
     "report_to": "wandb",
     "dataloader_num_workers": 0,
     "save_strategy": "epoch",
