@@ -165,3 +165,7 @@ save-*
 dataset_processed
 wandb/
 output/
+EleutherAI
+google
+mlabonne
+trl
