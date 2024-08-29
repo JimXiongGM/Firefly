@@ -15,6 +15,8 @@ class Template:
 
 template_dict: Dict[str, Template] = dict()
 
+'default','llama3','gemma','yi','internlm','internlm2','qwen','yi','deepseek','chatglm2','chatglm3','ziya2','minicpm','zephyr','mistral','mixtral','baichuan','baichuan2','vicuna','llama2','phi3',
+
 
 def register_template(template_name, system_format, user_format, assistant_format, system, stop_word=None):
     template_dict[template_name] = Template(
